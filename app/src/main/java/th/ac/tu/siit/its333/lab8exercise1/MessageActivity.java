@@ -71,6 +71,11 @@ public class MessageActivity extends ActionBarActivity implements Runnable {
 
     @Override
     public void run() {
+
+        LoadMessageTask task = new LoadMessageTask();
+        task.execute();
+
+        handler.postDelayed(this, 30000);
     }
 
     @Override
@@ -105,7 +110,11 @@ public class MessageActivity extends ActionBarActivity implements Runnable {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_refresh) {
+            handler.removeCallbacks(this);
+            LoadMessageTask task = new LoadMessageTask();
+            task.execute();
 
+            handler.postDelayed(this, 30000);
             return true;
         }
 
@@ -119,6 +128,8 @@ public class MessageActivity extends ActionBarActivity implements Runnable {
             BufferedReader reader;
             StringBuilder buffer = new StringBuilder();
             String line;
+            String messages;
+            String uname;
 
             try {
                 Log.e("LoadMessageTask", ""+ timestamp);
@@ -146,7 +157,21 @@ public class MessageActivity extends ActionBarActivity implements Runnable {
                     //data.add(0, item);
                     JSONObject json = new JSONObject(buffer.toString());
 
+                    JSONArray msgArray = json.getJSONArray("msg");
+
+                    for(int i=0;i<msgArray.length();i++ ) {
+                        JSONObject jMessages = msgArray.getJSONObject(i);
+                        uname = jMessages.getString("user");
+                        messages = jMessages.getString("message");
+                        timestamp = jMessages.getInt("time");
+                        Map<String, String> item = new HashMap<String, String>();
+                        item.put("user", uname);
+                        item.put("message",messages);
+                        data.add(0, item);
+                    }
+
                 }
+                return true;
             } catch (MalformedURLException e) {
                 Log.e("LoadMessageTask", "Invalid URL");
             } catch (IOException e) {
@@ -181,6 +206,27 @@ public class MessageActivity extends ActionBarActivity implements Runnable {
             HttpClient h = new DefaultHttpClient();
             HttpPost p = new HttpPost("http://ict.siit.tu.ac.th/~cholwich/microblog/post.php");
 
+            List<NameValuePair> values = new ArrayList<NameValuePair>();
+            values.add(new BasicNameValuePair("user", user));
+            values.add(new BasicNameValuePair("message", message));
+            try {
+                p.setEntity(new UrlEncodedFormEntity(values));
+                HttpResponse response = h.execute(p);
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(response.getEntity().getContent()));
+                while((line = reader.readLine()) != null) {
+                    buffer.append(line);
+
+                }
+
+                return true;
+            } catch (UnsupportedEncodingException e) {
+                Log.e("Error", "Invalid encoding");
+            } catch (ClientProtocolException e) {
+                Log.e("Error", "Error in posting a message");
+            } catch (IOException e) {
+                Log.e("Error", "I/O Exception");
+            }
 
 
             return false;
@@ -193,7 +239,13 @@ public class MessageActivity extends ActionBarActivity implements Runnable {
                         "Successfully post your status",
                         Toast.LENGTH_SHORT);
                 t.show();
+
+                LoadMessageTask task = new LoadMessageTask();
+                task.execute();
+
+
             }
+
             else {
                 Toast t = Toast.makeText(MessageActivity.this.getApplicationContext(),
                         "Unable to post your status",
